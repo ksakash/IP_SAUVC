@@ -1,0 +1,26 @@
+<launch>
+	<node name="gate_detection" pkg="test_pkg" type="gate_detection" respawn="true" output="screen">
+		<param name="r1min" type="int" value="257"/>
+		<param name="r1max" type="int" value="257"/>
+		<param name="r2min" type="int" value="257"/>
+		<param name="r2max" type="int" value="257"/>
+		<param name="r3min" type="int" value="257"/>
+		<param name="r3max" type="int" value="257"/>
+
+		<param name="g1min" type="int" value="257"/>
+		<param name="g1max" type="int" value="257"/>
+		<param name="g2min" type="int" value="257"/>
+		<param name="g2max" type="int" value="257"/>
+		<param name="g3min" type="int" value="257"/>
+		<param name="g3max" type="int" value="257"/>
+
+		<param name="b1min" type="int" value="257"/>
+		<param name="b1max" type="int" value="257"/>
+		<param name="b2min" type="int" value="257"/>
+		<param name="b2max" type="int" value="257"/>
+		<param name="b3min" type="int" value="257"/>
+		<param name="b3max" type="int" value="257"/>
+
+	</node>
+
+</launch>
