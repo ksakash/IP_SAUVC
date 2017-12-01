@@ -31,6 +31,7 @@ rosparam dump ~/catkin_ws/src/auv/task_handler_layer/task_buoy/launch/dump.yaml 
 echo -e \"parameters loaded!!\" \n\
 rosparam load ~/catkin_ws/src/auv/task_handler_layer/task_buoy/launch/dump.yaml /buoy_detection\
 "
+typedef std::vector<std::vector<cv::Point2f> > contour_array;
 
 cv::Mat frame, newframe, balanced_image, dst1;
 std::vector<cv::Mat> thresholded(3);
@@ -145,13 +146,13 @@ void imageCallback(const sensor_msgs::ImageConstPtr &msg)
   }
 }
 
-bool isGateDectected(std::vector<std::vector<cv::Point> > contour0, std::vector<std::vector<cv::Point> > contour1, std::vector<std::vector<cv::Point> > contour2){
+bool isGateDectected(contour_array contour0, contour_array contour1, contour_array contour2){
 
   return ((!contour0.empty())||(!contour1.empty())||(!contour2.empty()));
 
 }
 
-int get_largest_contour_index(std::vector<std::vector<cv::Point> > contours){ // to get the leargest contour index in a group of contours
+int get_largest_contour_index(contour_array contours){ // to get the leargest contour index in a group of contours
 
   int largest_contour_index = 0;
   double largest_area = 0;
@@ -170,7 +171,7 @@ int get_largest_contour_index(std::vector<std::vector<cv::Point> > contours){ //
 
 }
 
-cv::Point2f get_center_of_contour(std::vector<std::vector<cv::Point> > contours){ // to get the center of the contour
+cv::Point2f get_center_of_contour(contour_array contours){ // to get the center of the contour
 
   int largest_contour_index = get_largest_contour_index(contours);
   std::vector<std::vector<cv::Point> > hull(1);
@@ -186,45 +187,58 @@ cv::Point2f get_center_of_contour(std::vector<std::vector<cv::Point> > contours)
 
 }
 
-void draw_min_fit_rectangle(cv::Mat &src, cv::Mat &drawing, std::vector<cv::Point> contour0, std::vector<cv::Point> contour1, std::vector<cv::Point> contour2)
-{ // to draw the detected contours on the blank image
+void draw_min_fit_rectangles(cv::Mat &src, cv::Mat &drawing, contour_array contour0, contour_array contour1, contour_array contour2)
+{
+  // to draw the detected contours on the blank image
+  if (!contour0.empty()){
+    std::vector<cv::Vec4i> hierarchy;
+    int largest_contour_index = get_largest_contour_index(contour0);
+    cv::RotatedRect minRect;
+    minRect = cv::minAreaRect(cv::Mat(contour0[largest_contour_index]));
 
-  std::vector<std::vector<cv::Point> > contours(3);
-  contours[0] = contour0;
-  contours[1] = contour1;
-  contours[2] = contour2;
-
-  std::vector<cv::Vec4i> hierarchy;
-
-  /// Find the rotated rectangles
-  std::vector<cv::RotatedRect> minRect(contours.size());
-
-  for( int i = 0; i < contours.size(); i++ ){
-    minRect[i] = cv::minAreaRect( cv::Mat(contours[i]) );
-  }
-
-  /// Draw contours + rotated rects + ellipses
-  cv::Mat drawing = cv::Mat::zeros( src.size(), CV_8UC3 );
-
-  for( int i = 0; i < contours.size(); i++ )
-  {
-    cv::Scalar color = cv::Scalar( rng.uniform(0, 255), rng.uniform(0,255), rng.uniform(0,255) );
-
-    // contour
-    cv::drawContours( drawing, contours, i, color, 1, 8, std::vector<cv::Vec4i>(), 0, cv::Point() );
-
-    // rotated rectangle
-    cv::Point2f rect_points[4]; minRect[i].points( rect_points );
+    cv::Point2f rect_points[4]; minRect.points( rect_points );
 
     for( int j = 0; j < 4; j++ ){
        cv::line( drawing, rect_points[j], rect_points[(j+1)%4], color, 1, 8 );
        cv::line( src, rect_points[j], rect_points[(j+1)%4], color, 1, 8 );
-
     }
+    cv::Scalar color = cv::Scalar( 0, 0, 255 );
+    cv::drawContours( drawing, contour0, largest_contour_index, color, 1, 8, hierarchy);
   }
 
-   return;
+  if (!contour1.empty()){
+    std::vector<cv::Vec4i> hierarchy;
+    int largest_contour_index = get_largest_contour_index(contour1);
+    cv::RotatedRect minRect;
+    minRect = cv::minAreaRect(cv::Mat(contour0[largest_contour_index]));
 
+    cv::Point2f rect_points[4]; minRect.points( rect_points );
+
+    for( int j = 0; j < 4; j++ ){
+       cv::line( drawing, rect_points[j], rect_points[(j+1)%4], color, 1, 8 );
+       cv::line( src, rect_points[j], rect_points[(j+1)%4], color, 1, 8 );
+    }
+
+    cv::Scalar color = cv::Scalar( 0, 255, 0 );
+    cv::drawContours( drawing, contour1, largest_contour_index, color, 1, 8, hierarchy);
+  }
+
+  if (!contour2.empty()){
+    std::vector<cv::Vec4i> hierarchy;
+    int largest_contour_index = get_largest_contour_index(contour2);
+    cv::RotatedRect minRect;
+    minRect = cv::minAreaRect(cv::Mat(contour2[largest_contour_index]));
+
+    cv::Point2f rect_points[4]; minRect.points( rect_points );
+
+    for( int j = 0; j < 4; j++ ){
+       cv::line( drawing, rect_points[j], rect_points[(j+1)%4], color, 1, 8 );
+       cv::line( src, rect_points[j], rect_points[(j+1)%4], color, 1, 8 );
+    }
+    cv::Scalar color = cv::Scalar( 255, 255, 255 );
+    cv::drawContours( drawing, contour2, largest_contour_index, color, 1, 8, hierarchy);
+  }
+   return;
 }
 
 cv::Point2f get_gate_center(std::vector<std::vector<cv::Point> > contour0, std::vector<std::vector<cv::Point> > contour1, std::vector<std::vector<cv::Point> > contour2){
@@ -429,6 +443,7 @@ int main(int argc, char **argv){
   cv::Point2f gate_center;
   int net_x_cord;
   int net_y_cord;
+  cv::Mat drawing;
 
   while(ros::ok()){
 
@@ -475,6 +490,7 @@ int main(int argc, char **argv){
       /// all the image proecssing till the threshold
 
       frame.copyTo(balanced_image);
+      drawing(frame.rows, frame.cols, CV_8UC1, cv::Scalar::all(0));
       balance_white(balanced_image);
       bilateralFilter(balanced_image, dst1, 4, 8, 8);
 
@@ -503,18 +519,16 @@ int main(int argc, char **argv){
       findContours(thresholded[1], contour1, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE);
       findContours(thresholded[2], contour2, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE);
 
-      cv::Mat combined_contour;
-
       int largest_contour_index0 = get_largest_contour_index(contour0);
       int largest_contour_index1 = get_largest_contour_index(contour1);
       int largest_contour_index2 = get_largest_contour_index(contour2);
-
-      draw_min_fit_rectangle(combined_contour, contour0[largest_contour_index0], contour1[largest_contour_index1], contour2[largest_contour_index2]);
 
       if (!gate_found){
         gate_found = isGateDectected(contour0, contour1, contour2);
         continue;
       }
+      
+      draw_min_fit_rectangles(frame, drawing, contour0[largest_contour_index0], contour1[largest_contour_index1], contour2[largest_contour_index2]);
 
       if (gate_found){
 
@@ -561,9 +575,7 @@ int main(int argc, char **argv){
           ros::spinOnce();
 
         }
-
         // if contour is empty
-
         else {
 
           if (net_x_cord < -270)

@@ -208,7 +208,7 @@ int main(int argc, char *argv[])
   // capture size -
   CvSize size = cvSize(width, height);
 
-  cv::Mat lab_image, balanced_image, image_clahe, dst1, balanced_image1, dstx, thresholded, dst;
+  cv::Mat balanced_image, thresholded, dst;
   std::vector<cv::Mat> lab_planes(3);
   cv::Point2f pinger_center, hitting_point, net_cord;
 
@@ -231,12 +231,12 @@ int main(int argc, char *argv[])
 
     frame.copyTo(balanced_image);
     balance_white(balanced_image);
-    bilateralFilter(balanced_image, dst1, 4, 8, 8);
+    bilateralFilter(balanced_image, dst, 4, 8, 8);
 
     cv::Scalar hsv_min = cv::Scalar(a1min, a2min, a3min, 0);
     cv::Scalar hsv_max = cv::Scalar(a1max, a2max, a3max, 0);
 
-    cv::inRange(balanced_image, hsv_min, hsv_max, thresholded);
+    cv::inRange(dst, hsv_min, hsv_max, thresholded);
 
     cv::dilate(thresholded, thresholded, getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5, 5)));
     cv::dilate(thresholded, thresholded, getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5, 5)));
@@ -342,9 +342,7 @@ int main(int argc, char *argv[])
             pub.publish(array);
           }
           ros::spinOnce();
-
         }
-
       }
 
       else {
