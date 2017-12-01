@@ -356,7 +356,7 @@ void rgb242rgb(char *YUV, char *RGB, int NumPixels)
 UsbCam::UsbCam()
   : io_(IO_METHOD_MMAP), fd_(-1), buffers_(NULL), n_buffers_(0), avframe_camera_(NULL),
     avframe_rgb_(NULL), avcodec_(NULL), avoptions_(NULL), avcodec_context_(NULL),
-    avframe_camera_size_(0), avframe_rgb_size_(0), video_sws_(NULL), image_(NULL), is_capturing_(false) {
+    avframe_camera_size_(0), avframe_rgb_size_(0), video_sws_(NULL), image_(NULL) {
 }
 UsbCam::~UsbCam()
 {
@@ -585,15 +585,8 @@ int UsbCam::read_frame()
   return 1;
 }
 
-bool UsbCam::is_capturing() {
-  return is_capturing_;
-}
-
 void UsbCam::stop_capturing(void)
 {
-  if(!is_capturing_) return;
-
-  is_capturing_ = false;
   enum v4l2_buf_type type;
 
   switch (io_)
@@ -615,9 +608,6 @@ void UsbCam::stop_capturing(void)
 
 void UsbCam::start_capturing(void)
 {
-
-  if(is_capturing_) return;
-
   unsigned int i;
   enum v4l2_buf_type type;
 
@@ -673,7 +663,6 @@ void UsbCam::start_capturing(void)
 
       break;
   }
-  is_capturing_ = true;
 }
 
 void UsbCam::uninit_device(void)
@@ -1029,11 +1018,11 @@ void UsbCam::start(const std::string& dev, io_method io_method,
   {
     pixelformat_ = V4L2_PIX_FMT_RGB24;
   }
-  else if (pixel_format == PIXEL_FORMAT_GREY)
+  /*else if (pixel_format == PIXEL_FORMAT_GREY)
   {
     pixelformat_ = V4L2_PIX_FMT_GREY;
     monochrome_ = true;
-  }
+  }*/
   else
   {
     ROS_ERROR("Unknown pixel format.");
@@ -1238,8 +1227,8 @@ UsbCam::pixel_format UsbCam::pixel_format_from_string(const std::string& str)
       return PIXEL_FORMAT_YUVMONO10;
     else if (str == "rgb24")
       return PIXEL_FORMAT_RGB24;
-    else if (str == "grey")
-      return PIXEL_FORMAT_GREY;
+    // else if (str == "grey")
+    //   return PIXEL_FORMAT_GREY;
     else
       return PIXEL_FORMAT_UNKNOWN;
 }
