@@ -35,9 +35,9 @@ typedef std::vector<std::vector<cv::Point2f> > contour_array;
 
 cv::Mat frame, newframe, balanced_image, dst1;
 std::vector<cv::Mat> thresholded(3);
-std::vector<std::vector<cv::Point> > contour0;
-std::vector<std::vector<cv::Point> > contour1;
-std::vector<std::vector<cv::Point> > contour2;
+contour_array contour0;
+contour_array contour1;
+contour_array contour2;
 
 int red_min[3], red_max[3], green_min[3], green_max[3], blue_min[3], blue_max[3]; // to store the color RGB values of all the rods
 int flag = 0;
@@ -197,12 +197,11 @@ void draw_min_fit_rectangles(cv::Mat &src, cv::Mat &drawing, contour_array conto
     minRect = cv::minAreaRect(cv::Mat(contour0[largest_contour_index]));
 
     cv::Point2f rect_points[4]; minRect.points( rect_points );
-
+    cv::Scalar color = cv::Scalar( 0, 0, 255 );
     for( int j = 0; j < 4; j++ ){
        cv::line( drawing, rect_points[j], rect_points[(j+1)%4], color, 1, 8 );
        cv::line( src, rect_points[j], rect_points[(j+1)%4], color, 1, 8 );
     }
-    cv::Scalar color = cv::Scalar( 0, 0, 255 );
     cv::drawContours( drawing, contour0, largest_contour_index, color, 1, 8, hierarchy);
   }
 
@@ -213,13 +212,11 @@ void draw_min_fit_rectangles(cv::Mat &src, cv::Mat &drawing, contour_array conto
     minRect = cv::minAreaRect(cv::Mat(contour0[largest_contour_index]));
 
     cv::Point2f rect_points[4]; minRect.points( rect_points );
-
+    cv::Scalar color = cv::Scalar( 0, 255, 0 );
     for( int j = 0; j < 4; j++ ){
        cv::line( drawing, rect_points[j], rect_points[(j+1)%4], color, 1, 8 );
        cv::line( src, rect_points[j], rect_points[(j+1)%4], color, 1, 8 );
     }
-
-    cv::Scalar color = cv::Scalar( 0, 255, 0 );
     cv::drawContours( drawing, contour1, largest_contour_index, color, 1, 8, hierarchy);
   }
 
@@ -230,18 +227,18 @@ void draw_min_fit_rectangles(cv::Mat &src, cv::Mat &drawing, contour_array conto
     minRect = cv::minAreaRect(cv::Mat(contour2[largest_contour_index]));
 
     cv::Point2f rect_points[4]; minRect.points( rect_points );
-
+    cv::Scalar color = cv::Scalar( 255, 255, 255 );
     for( int j = 0; j < 4; j++ ){
        cv::line( drawing, rect_points[j], rect_points[(j+1)%4], color, 1, 8 );
        cv::line( src, rect_points[j], rect_points[(j+1)%4], color, 1, 8 );
     }
-    cv::Scalar color = cv::Scalar( 255, 255, 255 );
+
     cv::drawContours( drawing, contour2, largest_contour_index, color, 1, 8, hierarchy);
   }
    return;
 }
 
-cv::Point2f get_gate_center(std::vector<std::vector<cv::Point> > contour0, std::vector<std::vector<cv::Point> > contour1, std::vector<std::vector<cv::Point> > contour2){
+cv::Point2f get_gate_center(contour_array contour0, contour_array contour1, contour_array contour2){
 
   cv::Point2f red_rod_center;
   cv::Point2f green_rod_center;
@@ -283,7 +280,7 @@ double distance(cv::Point2f a, cv::Point2f b){
 
 }
 
-void draw_gate(cv::Mat &src, std::vector<std::vector<cv::Point> > contour0, std::vector<std::vector<cv::Point> > contour1, std::vector<std::vector<cv::Point> > contour2, cv::Point2f gate_center){
+void draw_gate(cv::Mat &src, contour_array contour0, contour_array contour1, contour_array contour2, cv::Point2f gate_center){
 
   if (contour2.empty()){
       return;
@@ -443,7 +440,6 @@ int main(int argc, char **argv){
   cv::Point2f gate_center;
   int net_x_cord;
   int net_y_cord;
-  cv::Mat drawing;
 
   while(ros::ok()){
 
@@ -490,7 +486,7 @@ int main(int argc, char **argv){
       /// all the image proecssing till the threshold
 
       frame.copyTo(balanced_image);
-      drawing(frame.rows, frame.cols, CV_8UC1, cv::Scalar::all(0));
+      cv::Mat drawing(frame.rows, frame.cols, CV_8UC1, cv::Scalar::all(0));
       balance_white(balanced_image);
       bilateralFilter(balanced_image, dst1, 4, 8, 8);
 
@@ -519,16 +515,16 @@ int main(int argc, char **argv){
       findContours(thresholded[1], contour1, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE);
       findContours(thresholded[2], contour2, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE);
 
-      int largest_contour_index0 = get_largest_contour_index(contour0);
-      int largest_contour_index1 = get_largest_contour_index(contour1);
-      int largest_contour_index2 = get_largest_contour_index(contour2);
+      // int largest_contour_index0 = get_largest_contour_index(contour0);
+      // int largest_contour_index1 = get_largest_contour_index(contour1);
+      // int largest_contour_index2 = get_largest_contour_index(contour2);
 
       if (!gate_found){
         gate_found = isGateDectected(contour0, contour1, contour2);
         continue;
       }
-      
-      draw_min_fit_rectangles(frame, drawing, contour0[largest_contour_index0], contour1[largest_contour_index1], contour2[largest_contour_index2]);
+
+      draw_min_fit_rectangles(frame, drawing, contour0, contour1, contour2);
 
       if (gate_found){
 

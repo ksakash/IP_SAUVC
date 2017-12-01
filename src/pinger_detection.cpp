@@ -21,6 +21,7 @@
 
 // int w = -2, x = -2, y = -2, z = -2;
 bool IP = false;
+bool pinger_found = false;
 int a1min, a1max, a2min, a2max, a3min, a3max;
 
 cv::Mat frame;
@@ -38,7 +39,7 @@ void callback(test_pkg::pingerConfig &config, uint32_t level)
   ROS_INFO("pinger_Reconfigure Request : New parameters : %d %d %d %d %d %d ", a1min, a1max, a2min, a2max, a3min, a3max);
 }
 
-void pingerListener(std_msgs::Bool msg)
+void pingerDetectionListener(std_msgs::Bool msg)
 {
   IP = msg.data;
 }
@@ -146,7 +147,7 @@ double distance(cv::Point2f a, cv::Point2f b){
 
 }
 
-cv::Point2f get_hitting_point(cv::Mat &src, std::vector<cv::Point2f> contour, double hitting_parameter, cv::Point2f center_of_mass){
+cv::Point2f get_hitting_point(cv::Mat &src, std::vector<cv::Point2f> contour, double hitting_parameter){
 
   /// 0 <= hitting_parameter <= 1
   /// 0 hitting_parameter means hitting the pinger rod in the middle
@@ -191,7 +192,7 @@ int main(int argc, char *argv[])
   ros::init(argc, argv, "pinger_detection");
   ros::NodeHandle n;
   ros::Publisher pub = n.advertise<std_msgs::Float64MultiArray>("/varun/ip/pinger", 1000);
-  ros::Subscriber sub = n.subscribe<std_msgs::Bool>("pinger_detection_switch", 1000, &pingerListener);
+  ros::Subscriber sub = n.subscribe<std_msgs::Bool>("pinger_detection_switch", 1000, &pingerDetectionListener);
   ros::Rate loop_rate(10);
 
   image_transport::ImageTransport it(n);
@@ -200,7 +201,7 @@ int main(int argc, char *argv[])
   image_transport::Publisher pub2 = it.advertise("/second_picture", 1);
   image_transport::Publisher pub3 = it.advertise("/third_picture", 1);
 
-  dynamic_reconfigure::Server<test_pkg::pingerConfig> server;
+    dynamic_reconfigure::Server<test_pkg::pingerConfig> server;
   dynamic_reconfigure::Server<test_pkg::pingerConfig>::CallbackType f;
   f = boost::bind(&callback, _1, _2);
   server.setCallback(f);
@@ -245,7 +246,7 @@ int main(int argc, char *argv[])
     if (IP)
     {
       // find contours
-      std::vector<std::vector<cv::Point> > contours;
+      std::vector<std::vector<cv::Point2f> > contours;
       cv::Mat thresholded_Mat = thresholded;
       findContours(thresholded_Mat, contours, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE);  // Find the contours in the image
       int largest_contour_index = 0;
@@ -262,7 +263,7 @@ int main(int argc, char *argv[])
       pub3.publish(msg3);
 
       if (!pinger_found){
-        pinger_found = isPingerDectected(thresholded_Mat);
+        pinger_found = isPingerDetected(thresholded_Mat);
         continue;
       }
 
@@ -272,8 +273,8 @@ int main(int argc, char *argv[])
         if (!contours.empty()){ // if there is even one contour
 
           largest_contour_index = get_largest_contour_index(contours);
-          pinger_center = get_contour_center(contours[largest_contour_index]);
-          hitting_point = get_hitting_point(frame, contours[largest_contour_index], 0.75, pinger_center);
+          // pinger_center = get_contour_center(contours[largest_contour_index]);
+          hitting_point = get_hitting_point(frame, contours[largest_contour_index], 0.75);
 
           net_cord.x = hitting_point.x - 320; // net_x_cord & net_y_cord for the coordinate w.r.t screen center
           net_cord.y = 240 - hitting_point.y;
@@ -349,6 +350,8 @@ int main(int argc, char *argv[])
         // contour is always empty
         continue;
       }
+
+    }
 
   }
 

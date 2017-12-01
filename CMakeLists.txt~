@@ -152,15 +152,15 @@ include_directories(include
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(gate_detection src/gate_singapore.cpp)
 target_link_libraries(gate_detection 
-${OpenCV_LIBRARIES}
+${OpenCV_LIBRARIES})
 ${catkin_LIBRARIES}
 )
-add_executable(ros_publisher src/ros_publisher.cpp)
-target_link_libraries(ros_publisher 
-${catkin_LIBRARIES} 
-${avcodec_LIBRARIES} 
-${swscale_LIBRARIES}
-)
+#add_executable(ros_publisher src/ros_publisher.cpp)
+#target_link_libraries(ros_publisher 
+#${catkin_LIBRARIES} 
+#${avcodec_LIBRARIES} 
+#${swscale_LIBRARIES}
+#)
 add_executable(basket_detection src/basket_detection.cpp)
 target_link_libraries(basket_detection 
 ${OpenCV_LIBRARIES}

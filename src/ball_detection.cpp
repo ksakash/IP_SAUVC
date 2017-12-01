@@ -27,7 +27,7 @@ cv::Mat frame;
 cv::Mat newframe;
 int count = 0, count_avg = 0, x = -1;
 
-void callback(task_ball::ballConfig &config, uint32_t level)
+void callback(test_pkg::ballConfig &config, uint32_t level)
 {
   b1min = config.b1min_param;
   b1max = config.b1max_param;
@@ -38,19 +38,17 @@ void callback(task_ball::ballConfig &config, uint32_t level)
   ROS_INFO("Ball_Reconfigure Request:New params : %d %d %d %d %d %d", b1min, b1max, b2min, b2max, b3min, b3max);
 }
 
-void basketDetectedListener(std_msgs::Bool msg)
+void ballDetectionListener(std_msgs::Bool msg)
 {
   IP = msg.data;
 }
 
 void imageCallback(const sensor_msgs::ImageConstPtr &msg)
 {
-  count++;
-  newframe = cv_bridge::toCvShare(msg, "bgr8")->image;
-  ///////////////////////////// DO NOT REMOVE THIS, IT COULD BE INGERIOUS TO HEALTH /////////////////////
-  newframe.copyTo(frame);
-  ////////////////////////// FATAL ///////////////////////////////////////////////////
-
+  try{
+    newframe = cv_bridge::toCvShare(msg, "bgr8")->image;
+    newframe.copyTo(frame);
+  }
   catch (cv_bridge::Exception &e)
   {
     ROS_ERROR("%s: Could not convert from '%s' to 'bgr8'.", ros::this_node::getName().c_str(), msg->encoding.c_str());
@@ -154,7 +152,7 @@ int main(int argc, char *argv[])
   ros::init(argc, argv, "ball_detection");
   ros::NodeHandle n;
   ros::Publisher pub = n.advertise<std_msgs::Float64MultiArray>("/varun/ip/ball", 1000);
-  ros::Subscriber sub = n.subscribe<std_msgs::Bool>("ball_detection_switch", 1000, &basketDetectedListener);
+  ros::Subscriber sub = n.subscribe<std_msgs::Bool>("ball_detection_switch", 1000, &ballDetectionListener);
   ros::Rate loop_rate(10);
 
   image_transport::ImageTransport it(n);
@@ -177,7 +175,7 @@ int main(int argc, char *argv[])
   for (int m = 0; m++; m < 5)
     r[m] = 0;
 
-  cv::Mat lab_image, balanced_image1, dstx, image_clahe, dst, dst1;
+  cv::Mat lab_image,thresholded, balanced_image1, dstx, image_clahe, dst, dst1;
 
   while (ros::ok())
   {
@@ -201,10 +199,10 @@ int main(int argc, char *argv[])
     dst1 = balance_white(balanced_image1, 0.05);
     denoise(dst1, 2);
 
-    cv::Scalar p_min = cv::Scalar(b1min, b2min, b3min, 0);
-    cv::Scalar p_max = cv::Scalar(b1max, b2max, b3max, 0);
+    cv::Scalar b_min = cv::Scalar(b1min, b2min, b3min, 0);
+    cv::Scalar b_max = cv::Scalar(b1max, b2max, b3max, 0);
 
-    cv::inRange(dst1, p_min, p_max, thresholded);
+    cv::inRange(dst1, b_min, b_max, thresholded);
 
     if (IP)
     {

@@ -25,9 +25,9 @@ int p1min, p1max, p2min, p2max, p3min, p3max;  // Default Params
 
 cv::Mat frame;
 cv::Mat newframe;
-int count = 0, count_avg = 0, x = -1;
+int count_avg = 0;
 
-void callback(task_basket::basketConfig &config, uint32_t level)
+void callback(test_pkg::basketConfig &config, uint32_t level)
 {
   p1min = config.p1min_param;
   p1max = config.p1max_param;
@@ -38,19 +38,17 @@ void callback(task_basket::basketConfig &config, uint32_t level)
   ROS_INFO("basket_Reconfigure Request:New params : %d %d %d %d %d %d", p1min, p1max, p2min, p2max, p3min, p3max);
 }
 
-void gateDetectedListener(std_msgs::Bool msg)
+void basketDetectionListener(std_msgs::Bool msg)
 {
   IP = msg.data;
 }
 
 void imageCallback(const sensor_msgs::ImageConstPtr &msg)
 {
-  count++;
-  newframe = cv_bridge::toCvShare(msg, "bgr8")->image;
-  ///////////////////////////// DO NOT REMOVE THIS, IT COULD BE INGERIOUS TO HEALTH /////////////////////
-  newframe.copyTo(frame);
-  ////////////////////////// FATAL ///////////////////////////////////////////////////
-
+  try{
+    newframe = cv_bridge::toCvShare(msg, "bgr8")->image;
+    newframe.copyTo(frame);
+  }
   catch (cv_bridge::Exception &e)
   {
     ROS_ERROR("%s: Could not convert from '%s' to 'bgr8'.", ros::this_node::getName().c_str(), msg->encoding.c_str());
@@ -154,7 +152,7 @@ int main(int argc, char *argv[])
   ros::init(argc, argv, "basket_detection");
   ros::NodeHandle n;
   ros::Publisher pub = n.advertise<std_msgs::Float64MultiArray>("/varun/ip/basket", 1000);
-  ros::Subscriber sub = n.subscribe<std_msgs::Bool>("basket_detection_switch", 1000, &gateDetectedListener);
+  ros::Subscriber sub = n.subscribe<std_msgs::Bool>("basket_detection_switch", 1000, &basketDetectionListener);
   ros::Rate loop_rate(10);
 
   image_transport::ImageTransport it(n);
@@ -177,7 +175,7 @@ int main(int argc, char *argv[])
   for (int m = 0; m++; m < 5)
     r[m] = 0;
 
-  cv::Mat lab_image, balanced_image1, dstx, image_clahe, dst, dst1;
+  cv::Mat lab_image, balanced_image1, dstx, image_clahe, dst, dst1, thresholded;
 
   while (ros::ok())
   {

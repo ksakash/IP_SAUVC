@@ -3,7 +3,7 @@
 #include <highgui.h>
 #include <ros/ros.h>
 #include "std_msgs/String.h"
-#include "std_msgs/Int8.h"
+#include "std_msgs/Int32.h"
 #include <fstream>
 #include <dynamic_reconfigure/server.h>
 #include <test_pkg/matConfig.h>
@@ -132,7 +132,7 @@ int main(int argc, char **argv){
   ros::init(argc, argv, "mat_detector");
   ros::NodeHandle n;
   ros::Publisher pub = n.advertise<std_msgs::Int32>("/varun/ip/mat", 1000);
-  ros::Subscriber sub = n.subscribe<std_msgs::Bool>("mat_detection_switch", 1000, &basketDetectedListener);
+  ros::Subscriber sub = n.subscribe<std_msgs::Bool>("mat_detection_switch", 1000, &matDetectionListener);
   ros::Rate loop_rate(10);
 
   image_transport::ImageTransport it(n);
@@ -141,8 +141,8 @@ int main(int argc, char **argv){
   image_transport::Publisher pub2 = it.advertise("/second_picture", 1);
   image_transport::Publisher pub3 = it.advertise("/third_picture", 1);
 
-  dynamic_reconfigure::Server<test_pkg::ballConfig> server;
-  dynamic_reconfigure::Server<test_pkg::ballConfig>::CallbackType f;
+  dynamic_reconfigure::Server<test_pkg::matConfig> server;
+  dynamic_reconfigure::Server<test_pkg::matConfig>::CallbackType f;
   f = boost::bind(&callback, _1, _2);
   server.setCallback(f);
 
@@ -161,7 +161,7 @@ int main(int argc, char **argv){
     }
 
     frame.copyTo(balanced_image);
-    balance_white(balanced_image);
+    balance_white(balanced_image, 0.05);
     bilateralFilter(balanced_image, dst, 4, 8, 8);
 
     cv::Scalar hsv_min = cv::Scalar(m1min, m2min, m3min, 0);
@@ -175,13 +175,13 @@ int main(int argc, char **argv){
 
     if (IP){
       // if half of the screen is green then we are inside the Mat
-      std::vector<std::vector<cv::Point> > contours;
-      findContours(thresholded_Mat, contours, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE);  // Find the contours in the image
+      std::vector<std::vector<cv::Point2f> > contours;
+      findContours(thresholded, contours, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE);  // Find the contours in the image
 
       if (!contours.empty()){
         int largest_contour_index = get_largest_contour_index(contours);
         cv::RotatedRect minRect;
-        minRect = cv::minAreaRect(cv::Mat(contours[leargest_contour_index]));
+        minRect = cv::minAreaRect(cv::Mat(contours[largest_contour_index]));
         cv::Point2f rect_points[4];
         minRect.points(rect_points);
 
@@ -192,13 +192,13 @@ int main(int argc, char **argv){
         double percentage = area/(640*480);
 
         if (percentage >= 0.5){
-          mat_status = 1;
+          mat_status.data = 1;
         }
         else if (percentage <= 0.05){
-          mat_status = -1;
+          mat_status.data = -1;
         }
         else {
-          mat_status = 0;
+          mat_status.data = 0;
         }
 
         pub.publish(mat_status);
