@@ -18,12 +18,14 @@
 #include <cv_bridge/cv_bridge.h>
 #include <sstream>
 #include <string>
+#include <math.h>
 
-// int w = -2, x = -2, y = -2, z = -2;
 bool IP = false;
 bool pinger_found = false;
 int a1min, a1max, a2min, a2max, a3min, a3max;
-
+int w1min, w1max, w2min, w2max, w3min, w3max;
+const double alpha;
+const double beta;
 cv::Mat frame;
 cv::Mat newframe;
 int count = 0, count_avg = 0;
@@ -49,9 +51,7 @@ void imageCallback(const sensor_msgs::ImageConstPtr &msg)
   try
   {
     newframe = cv_bridge::toCvShare(msg, "bgr8")->image;
-    ///////////////////////////// DO NOT REMOVE THIS, IT COULD BE INGERIOUS TO HEALTH /////////////////////
     newframe.copyTo(frame);
-    ////////////////////////// FATAL ///////////////////////////////////////////////////
   }
   catch (cv_bridge::Exception &e)
   {
@@ -164,8 +164,8 @@ cv::Point2f get_hitting_point(cv::Mat &src, std::vector<cv::Point2f> contour, do
   double L;
   double hp;
 
-  a = distance(rect_points[0], rect_points[1]);
-  b = distance(rect_points[1], rect_points[2]);
+  a = sqrt(distance(rect_points[0], rect_points[1]));
+  b = sqrt(distance(rect_points[1], rect_points[2]));
 
   if (a > b) L = a;
   else L = b;
@@ -176,14 +176,55 @@ cv::Point2f get_hitting_point(cv::Mat &src, std::vector<cv::Point2f> contour, do
 
 }
 
-bool isPingerDetected(cv::Mat &src){
+bool isPingerDetected(cv::Mat &src, std::vector<std::vector<cv::Point2f> > contours){
 
-  /// criteria for deciding whether an image contains a pinger or not
-  /// based on the area of the largest contour
-  /// above a certain limit then the pinger is present
+    if (contours.empty()) return false;
+    else if (!contours.empty()){
+      int largest_contour_index = get_largest_contour_index(contours);
+      double a = contourArea(contours[largest_contour_index], false);
 
+      if (a > alpha){
+        return true;
+      }
+    }
 }
 
+bool ballDetector(cv::Mat &src){
+
+  cv::Mat thresholded;
+  cv::Scalar hsv_min = cv::Scalar(w1min, w2min, w3min, 0);
+  cv::Scalar hsv_max = cv::Scalar(w1max, w2max, w3max, 0);
+  cv::inRange(src, hsv_min, hsv_max, thresholded);
+  cv::dilate(thresholded, thresholded, getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5, 5)));
+  cv::dilate(thresholded, thresholded, getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5, 5)));
+  cv::dilate(thresholded, thresholded, getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3)));
+  cv::dilate(thresholded, thresholded, getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5, 5)));
+  cv::dilate(thresholded, thresholded, getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3)));
+
+  std::vector<std::vector<cv::Point2f> > contours;
+  findContours(thresholded, contours, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE);  // Find the contours in the image
+
+  if (contours.empty()){
+    return false;
+  }
+  else if (!contours.empty()){
+
+    cv::Point2f center;
+    float radius;
+    int largest_contour_index = get_largest_contour_index(contours);
+    cv::minEnclosingCircle(contours[largest_contour_index], center, radius);
+    double area = contourArea(contours[largest_contour_index], false);
+
+    circle(src, center, radius, cv::Scalar(255, 255, 255), 1, 8, 0);
+
+    if (area > beta){
+      return true;
+    }
+    else {
+      return false
+    }
+  }
+}
 
 int main(int argc, char *argv[])
 {
@@ -191,7 +232,8 @@ int main(int argc, char *argv[])
 
   ros::init(argc, argv, "pinger_detection");
   ros::NodeHandle n;
-  ros::Publisher pub = n.advertise<std_msgs::Float64MultiArray>("/varun/ip/pinger", 1000);
+  ros::Publisher pub = n.advertise<std_msgs::Float64MultiArray>("/varun/ip/pinger/detector", 1000);
+  ros::Publisher pub4 = n.advertise<std_msgs::Bool>("/varun/ip/pinger/ball", 1000)
   ros::Subscriber sub = n.subscribe<std_msgs::Bool>("pinger_detection_switch", 1000, &pingerDetectionListener);
   ros::Rate loop_rate(10);
 
@@ -201,7 +243,7 @@ int main(int argc, char *argv[])
   image_transport::Publisher pub2 = it.advertise("/second_picture", 1);
   image_transport::Publisher pub3 = it.advertise("/third_picture", 1);
 
-    dynamic_reconfigure::Server<test_pkg::pingerConfig> server;
+  dynamic_reconfigure::Server<test_pkg::pingerConfig> server;
   dynamic_reconfigure::Server<test_pkg::pingerConfig>::CallbackType f;
   f = boost::bind(&callback, _1, _2);
   server.setCallback(f);
@@ -212,6 +254,7 @@ int main(int argc, char *argv[])
   cv::Mat balanced_image, thresholded, dst;
   std::vector<cv::Mat> lab_planes(3);
   cv::Point2f pinger_center, hitting_point, net_cord;
+  bool ball_status = false;
 
   while (ros::ok())
   {
@@ -310,12 +353,13 @@ int main(int argc, char *argv[])
             pub.publish(array);
           }
 
+          ball_status.data = true;
+          pub4.publish(ball_status);
           ros::spinOnce();
+          continue;
 
         }
-
         // if contour is empty
-
         else {
 
           if (net_cord.x < -270)
@@ -343,6 +387,7 @@ int main(int argc, char *argv[])
             pub.publish(array);
           }
           ros::spinOnce();
+          continue;
         }
       }
 
@@ -350,10 +395,7 @@ int main(int argc, char *argv[])
         // contour is always empty
         continue;
       }
-
     }
-
   }
-
   return 0;
 }
