@@ -6,7 +6,7 @@
 #include "std_msgs/Int8.h"
 #include <fstream>
 #include <dynamic_reconfigure/server.h>
-#include <test_pkg/ballConfig.h>
+#include <IP_SAUVC/ballConfig.h>
 #include <vector>
 #include <std_msgs/Bool.h>
 #include <opencv2/core/core.hpp>
@@ -27,7 +27,7 @@ cv::Mat frame;
 cv::Mat newframe;
 int count = 0, count_avg = 0, x = -1;
 
-void callback(test_pkg::ballConfig &config, uint32_t level)
+void callback(IP_SAUVC::ballConfig &config, uint32_t level)
 {
   b1min = config.b1min_param;
   b1max = config.b1max_param;
@@ -161,8 +161,8 @@ int main(int argc, char *argv[])
   image_transport::Publisher pub2 = it.advertise("/second_picture", 1);
   image_transport::Publisher pub3 = it.advertise("/third_picture", 1);
 
-  dynamic_reconfigure::Server<test_pkg::ballConfig> server;
-  dynamic_reconfigure::Server<test_pkg::ballConfig>::CallbackType f;
+  dynamic_reconfigure::Server<IP_SAUVC::ballConfig> server;
+  dynamic_reconfigure::Server<IP_SAUVC::ballConfig>::CallbackType f;
   f = boost::bind(&callback, _1, _2);
   server.setCallback(f);
 

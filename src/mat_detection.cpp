@@ -6,7 +6,7 @@
 #include "std_msgs/Int32.h"
 #include <fstream>
 #include <dynamic_reconfigure/server.h>
-#include <test_pkg/matConfig.h>
+#include <IP_SAUVC/matConfig.h>
 #include <vector>
 #include <std_msgs/Bool.h>
 #include <opencv2/core/core.hpp>
@@ -26,7 +26,7 @@ int m1min, m1max, m2min, m2max, m3min, m3max;
 
 cv::Mat frame, newframe;
 
-void callback(test_pkg::matConfig &config, uint32_t level)
+void callback(IP_SAUVC::matConfig &config, uint32_t level)
 {
   m1min = config.m1min_param;
   m1max = config.m1max_param;
@@ -141,8 +141,8 @@ int main(int argc, char **argv){
   image_transport::Publisher pub2 = it.advertise("/second_picture", 1);
   image_transport::Publisher pub3 = it.advertise("/third_picture", 1);
 
-  dynamic_reconfigure::Server<test_pkg::matConfig> server;
-  dynamic_reconfigure::Server<test_pkg::matConfig>::CallbackType f;
+  dynamic_reconfigure::Server<IP_SAUVC::matConfig> server;
+  dynamic_reconfigure::Server<IP_SAUVC::matConfig>::CallbackType f;
   f = boost::bind(&callback, _1, _2);
   server.setCallback(f);
 

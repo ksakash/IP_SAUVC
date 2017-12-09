@@ -10,7 +10,7 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <dynamic_reconfigure/server.h>
-#include <test_pkg/gateConfig.h>
+#include <IP_SAUVC/gateConfig.h>
 #include <opencv2/opencv.hpp>
 #include <opencv/highgui.h>
 #include <image_transport/image_transport.h>
@@ -47,7 +47,7 @@ int count = 0;
 bool task_gate_done;
 bool gate_found;
 
-void callback(test_pkg::gateConfig &config, uint32_t level){
+void callback(IP_SAUVC::gateConfig &config, uint32_t level){
 
   flag = config.flag_param;
   threshold = config.threshold_param;
@@ -431,8 +431,8 @@ int main(int argc, char **argv){
   nh.getParam("gate_detection/b3max", green_min[2]);
   nh.getParam("gate_detection/b3min", green_max[2]);
 
-  dynamic_reconfigure::Server<test_pkg::gateConfig> server;
-  dynamic_reconfigure::Server<test_pkg::gateConfig>::CallbackType f;
+  dynamic_reconfigure::Server<IP_SAUVC::gateConfig> server;
+  dynamic_reconfigure::Server<IP_SAUVC::gateConfig>::CallbackType f;
   f = boost::bind(&callback, _1, _2);
   server.setCallback(f);
 

@@ -10,7 +10,7 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <dynamic_reconfigure/server.h>
-#include <test_pkg/pingerConfig.h>
+#include <IP_SAUVC/pingerConfig.h>
 #include <opencv2/opencv.hpp>
 #include <opencv/highgui.h>
 #include <image_transport/image_transport.h>
@@ -24,13 +24,13 @@ bool IP = false;
 bool pinger_found = false;
 int a1min, a1max, a2min, a2max, a3min, a3max;
 int w1min, w1max, w2min, w2max, w3min, w3max;
-const double alpha;
-const double beta;
+const double alpha = 0;
+const double beta = 0;
 cv::Mat frame;
 cv::Mat newframe;
 int count = 0, count_avg = 0;
 
-void callback(test_pkg::pingerConfig &config, uint32_t level)
+void callback(IP_SAUVC::pingerConfig &config, uint32_t level)
 {
   a1min = config.a1min_param;
   a1max = config.a1max_param;
@@ -176,7 +176,7 @@ cv::Point2f get_hitting_point(cv::Mat &src, std::vector<cv::Point2f> contour, do
 
 }
 
-bool isPingerDetected(cv::Mat &src, std::vector<std::vector<cv::Point2f> > contours){
+bool isPingerDetected(std::vector<std::vector<cv::Point2f> > contours){
 
     if (contours.empty()) return false;
     else if (!contours.empty()){
@@ -221,7 +221,7 @@ bool ballDetector(cv::Mat &src){
       return true;
     }
     else {
-      return false
+      return false;
     }
   }
 }
@@ -233,7 +233,7 @@ int main(int argc, char *argv[])
   ros::init(argc, argv, "pinger_detection");
   ros::NodeHandle n;
   ros::Publisher pub = n.advertise<std_msgs::Float64MultiArray>("/varun/ip/pinger/detector", 1000);
-  ros::Publisher pub4 = n.advertise<std_msgs::Bool>("/varun/ip/pinger/ball", 1000)
+  ros::Publisher pub4 = n.advertise<std_msgs::Bool>("/varun/ip/pinger/ball", 1000);
   ros::Subscriber sub = n.subscribe<std_msgs::Bool>("pinger_detection_switch", 1000, &pingerDetectionListener);
   ros::Rate loop_rate(10);
 
@@ -243,8 +243,8 @@ int main(int argc, char *argv[])
   image_transport::Publisher pub2 = it.advertise("/second_picture", 1);
   image_transport::Publisher pub3 = it.advertise("/third_picture", 1);
 
-  dynamic_reconfigure::Server<test_pkg::pingerConfig> server;
-  dynamic_reconfigure::Server<test_pkg::pingerConfig>::CallbackType f;
+  dynamic_reconfigure::Server<IP_SAUVC::pingerConfig> server;
+  dynamic_reconfigure::Server<IP_SAUVC::pingerConfig>::CallbackType f;
   f = boost::bind(&callback, _1, _2);
   server.setCallback(f);
 
@@ -254,7 +254,8 @@ int main(int argc, char *argv[])
   cv::Mat balanced_image, thresholded, dst;
   std::vector<cv::Mat> lab_planes(3);
   cv::Point2f pinger_center, hitting_point, net_cord;
-  bool ball_status = false;
+  std_msgs::Bool ball_status;
+  ball_status.data = false;
 
   while (ros::ok())
   {
@@ -306,7 +307,7 @@ int main(int argc, char *argv[])
       pub3.publish(msg3);
 
       if (!pinger_found){
-        pinger_found = isPingerDetected(thresholded_Mat);
+        pinger_found = isPingerDetected(contours);
         continue;
       }
 

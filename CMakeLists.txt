@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(test_pkg)
+project(IP_SAUVC)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -29,6 +29,7 @@ find_package( OpenCV REQUIRED )
 find_package( PkgConfig REQUIRED )
 pkg_check_modules(avcodec libavcodec REQUIRED)
 pkg_check_modules(swscale libswscale REQUIRED)
+
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
 ## See http://ros.org/doc/api/catkin/html/user_guide/setup_dot_py.html
@@ -119,7 +120,7 @@ generate_dynamic_reconfigure_options(
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
 #  INCLUDE_DIRS include
-#  LIBRARIES test_pkg
+#  LIBRARIES IP_SAUVC
 CATKIN_DEPENDS actionlib actionlib_msgs message_generation roscpp roslint rospy sensor_msgs std_msgs
 #  DEPENDS system_lib
 )
@@ -139,7 +140,7 @@ include_directories(include
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
-#   src/${PROJECT_NAME}/test_pkg.cpp
+#   src/${PROJECT_NAME}/IP_SAUVC.cpp
 # )
 
 ## Add cmake target dependencies of the library
@@ -150,19 +151,28 @@ include_directories(include
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
+
+add_library(usb_cam src/usb_cam.cpp)
+target_link_libraries( usb_cam
+${avcodec_LIBRARIES}
+${swscale_LIBRARIES}
+${catkin_LIBRARIES}
+)
+
 add_executable(gate_detection src/gate_singapore.cpp)
-target_link_libraries(gate_detection 
+target_link_libraries(gate_detection
 ${OpenCV_LIBRARIES}
 ${catkin_LIBRARIES}
 )
 add_executable(ros_publisher src/ros_publisher.cpp)
-target_link_libraries(ros_publisher 
-${catkin_LIBRARIES} 
-${avcodec_LIBRARIES} 
+target_link_libraries(ros_publisher
+usb_cam
+${catkin_LIBRARIES}
+${avcodec_LIBRARIES}
 ${swscale_LIBRARIES}
 )
 add_executable(basket_detection src/basket_detection.cpp)
-target_link_libraries(basket_detection 
+target_link_libraries(basket_detection
 ${OpenCV_LIBRARIES}
 ${catkin_LIBRARIES}
 )
@@ -174,16 +184,16 @@ ${catkin_LIBRARIES}
 )
 
 add_executable(pinger_detection src/pinger_detection.cpp)
-target_link_libraries(pinger_detection 
+target_link_libraries(pinger_detection
 ${OpenCV_LIBRARIES}
 ${catkin_LIBRARIES}
 )
 
-add_executable(mat_detection src/mat_detection.cpp)
-target_link_libraries(mat_detection
-${OpenCV_LIBRARIES}
-${catkin_LIBRARIES}
-)
+#add_executable(mat_detection src/mat_detection.cpp)
+#target_link_libraries(mat_detection
+#${OpenCV_LIBRARIES}
+#${catkin_LIBRARIES}
+#)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -240,7 +250,7 @@ ${catkin_LIBRARIES}
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_test_pkg.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_IP_SAUVC.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()

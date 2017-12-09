@@ -10,7 +10,7 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <dynamic_reconfigure/server.h>
-#include <test_pkg/grabberConfig.h>
+#include <IP_SAUVC/grabberConfig.h>
 #include <opencv2/opencv.hpp>
 #include <opencv/highgui.h>
 #include <image_transport/image_transport.h>
@@ -25,7 +25,7 @@ int g1min, g1max, g2min, g2max, g3min, g3max;
 
 cv::Mat frame, newframe;
 
-void callback(test_pkg::grabberConfig &config, uint32_t level)
+void callback(IP_SAUVC::grabberConfig &config, uint32_t level)
 {
   g1min = config.g1min_param;
   g1max = config.g1max_param;
@@ -161,8 +161,8 @@ int main(int argc, char *argv[])
   image_transport::Publisher pub2 = it.advertise("/second_picture", 1);
   image_transport::Publisher pub3 = it.advertise("/third_picture", 1);
 
-  dynamic_reconfigure::Server<test_pkg::grabberConfig> server;
-  dynamic_reconfigure::Server<test_pkg::grabberConfig>::CallbackType f;
+  dynamic_reconfigure::Server<IP_SAUVC::grabberConfig> server;
+  dynamic_reconfigure::Server<IP_SAUVC::grabberConfig>::CallbackType f;
   f = boost::bind(&callback, _1, _2);
   server.setCallback(f);
 

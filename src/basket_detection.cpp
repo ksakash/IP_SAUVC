@@ -6,7 +6,7 @@
 #include "std_msgs/Int8.h"
 #include <fstream>
 #include <dynamic_reconfigure/server.h>
-#include <test_pkg/basketConfig.h>
+#include <IP_SAUVC/basketConfig.h>
 #include <vector>
 #include <std_msgs/Bool.h>
 #include <opencv2/core/core.hpp>
@@ -27,7 +27,7 @@ cv::Mat frame;
 cv::Mat newframe;
 int count_avg = 0;
 
-void callback(test_pkg::basketConfig &config, uint32_t level)
+void callback(IP_SAUVC::basketConfig &config, uint32_t level)
 {
   p1min = config.p1min_param;
   p1max = config.p1max_param;
@@ -161,8 +161,8 @@ int main(int argc, char *argv[])
   image_transport::Publisher pub2 = it.advertise("/second_picture", 1);
   image_transport::Publisher pub3 = it.advertise("/third_picture", 1);
 
-  dynamic_reconfigure::Server<test_pkg::basketConfig> server;
-  dynamic_reconfigure::Server<test_pkg::basketConfig>::CallbackType f;
+  dynamic_reconfigure::Server<IP_SAUVC::basketConfig> server;
+  dynamic_reconfigure::Server<IP_SAUVC::basketConfig>::CallbackType f;
   f = boost::bind(&callback, _1, _2);
   server.setCallback(f);
 
