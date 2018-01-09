@@ -24,16 +24,16 @@ cv::RNG rng(12345);
 #define SHELLSCRIPT_DUMP "\
 #/bin/bash \n\
 echo -e \"parameters dumped!!\" \n\
-rosparam dump ~/catkin_ws/src/auv/task_handler_layer/task_buoy/launch/dump.yaml /buoy_detection\
+rosparam dump ~/sauvc_ws/src/IP_SAUVC/launch/dump.yaml /gate_detection\
 "
 #define SHELLSCRIPT_LOAD "\
 #/bin/bash \n\
 echo -e \"parameters loaded!!\" \n\
-rosparam load ~/catkin_ws/src/auv/task_handler_layer/task_buoy/launch/dump.yaml /buoy_detection\
+rosparam load ~/sauvc_ws/src/IP_SAUVC/launch/dump.yaml /gate_detection\
 "
-typedef std::vector<std::vector<cv::Point2f> > contour_array;
+typedef std::vector<std::vector<cv::Point> > contour_array;
 
-cv::Mat frame, newframe, balanced_image, dst1;
+cv::Mat frame, newframe, balanced_image, dst1, image_clahe;
 std::vector<cv::Mat> thresholded(3);
 contour_array contour0;
 contour_array contour1;
@@ -128,9 +128,13 @@ void callback(IP_SAUVC::gateConfig &config, uint32_t level){
   save = config.save_param;
 
   // for informing about the changing parameters
-  ROS_INFO("Gate_Reconfigure Request:Red_Pole_params : %d %d %d %d %d %d %d %d %d", red_min[0], red_max[0], blue_min[0], blue_max[0], green_min[0], green_max[0], save, flag, threshold);
-  ROS_INFO("Gate_Reconfigure Request:Green_Pole_params : %d %d %d %d %d %d %d %d %d", red_min[1], red_max[1], blue_min[1], blue_max[1], green_min[1], green_max[1]);
-
+  ROS_INFO("Gate_Reconfigure Request:Red_Pole_params : %d %d %d %d %d %d", red_min[0], red_max[0], blue_min[0], blue_max[0], green_min[0],
+  green_max[0]);
+  ROS_INFO("Gate_Reconfigure Request:Green_Pole_params : %d %d %d %d %d %d", red_min[1], red_max[1], blue_min[1], blue_max[1], green_min[1],
+  green_max[1]);
+  ROS_INFO("Gate_Reconfigure Request:Black_Pole_params : %d %d %d %d %d %d", red_min[2], red_max[2], blue_min[2], blue_max[2], green_min[2],
+  green_max[2]);
+  ROS_INFO("Gate_Reconfigure Request:Saving Params : %d %d %d", save, threshold, flag);
 }
 
 void imageCallback(const sensor_msgs::ImageConstPtr &msg)
@@ -171,7 +175,7 @@ int get_largest_contour_index(contour_array contours){ // to get the leargest co
 
 }
 
-cv::Point2f get_center_of_contour(contour_array contours){ // to get the center of the contour
+cv::Point get_center_of_contour(contour_array contours){ // to get the center of the contour
 
   int largest_contour_index = get_largest_contour_index(contours);
   std::vector<std::vector<cv::Point> > hull(1);
@@ -179,17 +183,18 @@ cv::Point2f get_center_of_contour(contour_array contours){ // to get the center 
 
   cv::Moments mu;
   mu = cv::moments(hull[0], false);
-  cv::Point2f center_of_mass;
+  cv::Point center_of_mass;
 
-  center_of_mass = cv::Point2f(mu.m10 / mu.m00, mu.m01 / mu.m00);
+  center_of_mass = cv::Point(mu.m10 / mu.m00, mu.m01 / mu.m00);
 
   return center_of_mass;
 
 }
 
-void draw_min_fit_rectangles(cv::Mat &src, cv::Mat &drawing, contour_array contour0, contour_array contour1, contour_array contour2)
+void draw_min_fit_rectangles(cv::Mat &src, cv::Mat &drawing, contour_array &contour0, contour_array &contour1, contour_array &contour2)
 {
   // to draw the detected contours on the blank image
+
   if (!contour0.empty()){
     std::vector<cv::Vec4i> hierarchy;
     int largest_contour_index = get_largest_contour_index(contour0);
@@ -209,8 +214,7 @@ void draw_min_fit_rectangles(cv::Mat &src, cv::Mat &drawing, contour_array conto
     std::vector<cv::Vec4i> hierarchy;
     int largest_contour_index = get_largest_contour_index(contour1);
     cv::RotatedRect minRect;
-    minRect = cv::minAreaRect(cv::Mat(contour0[largest_contour_index]));
-
+    minRect = cv::minAreaRect(cv::Mat(contour1[largest_contour_index]));
     cv::Point2f rect_points[4]; minRect.points( rect_points );
     cv::Scalar color = cv::Scalar( 0, 255, 0 );
     for( int j = 0; j < 4; j++ ){
@@ -238,12 +242,12 @@ void draw_min_fit_rectangles(cv::Mat &src, cv::Mat &drawing, contour_array conto
    return;
 }
 
-cv::Point2f get_gate_center(contour_array contour0, contour_array contour1, contour_array contour2){
+cv::Point get_gate_center(contour_array contour0, contour_array contour1, contour_array contour2){
 
-  cv::Point2f red_rod_center;
-  cv::Point2f green_rod_center;
-  cv::Point2f black_rod_center;
-  cv::Point2f gate_center;
+  cv::Point red_rod_center;
+  cv::Point green_rod_center;
+  cv::Point black_rod_center;
+  cv::Point gate_center;
 
   if (!contour0.empty())
     red_rod_center = get_center_of_contour(contour0);
@@ -274,13 +278,13 @@ cv::Point2f get_gate_center(contour_array contour0, contour_array contour1, cont
 
 }
 
-double distance(cv::Point2f a, cv::Point2f b){
+double distance(cv::Point a, cv::Point b){
 
   return (a.x - b.x)*(a.x - b.x) + (a.y - b.y)*(a.y - b.y);
 
 }
 
-void draw_gate(cv::Mat &src, contour_array contour0, contour_array contour1, contour_array contour2, cv::Point2f gate_center){
+void draw_gate(cv::Mat &src, contour_array contour0, contour_array contour1, contour_array contour2, cv::Point gate_center){
 
   if (contour2.empty()){
       return;
@@ -329,10 +333,10 @@ void draw_gate(cv::Mat &src, contour_array contour0, contour_array contour1, con
       B = b;
     }
 
-    cv::Point2f X, Y;
+    cv::Point X, Y;
 
-    X = cv::Point2f(gate_center.x + sqrt(L)/2, gate_center.y + sqrt(B)/2);
-    Y = cv::Point2f(gate_center.x - sqrt(L)/2, gate_center.y - sqrt(B)/2);
+    X = cv::Point(gate_center.x + sqrt(L)/2, gate_center.y + sqrt(B)/2);
+    Y = cv::Point(gate_center.x - sqrt(L)/2, gate_center.y - sqrt(B)/2);
 
     cv::rectangle(src, X, Y, cv::Scalar(255, 255, 255), 2, 8, 0);
 
@@ -388,6 +392,45 @@ void balance_white(cv::Mat mat)
   }
 }
 
+cv::Mat color_correction(cv::Mat &src, int parameter){ // same for all the tasks
+
+  std::vector<cv::Mat> lab_planes(3);
+  cv::Mat dst, lab_image;
+
+  cv::cvtColor(src, lab_image, CV_BGR2Lab);
+
+  // Extract the L channel
+  cv::split(lab_image, lab_planes);  // now we have the L image in lab_planes[0]
+
+  // apply the CLAHE algorithm to the L channel
+  cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE();
+  clahe->setClipLimit(parameter);
+
+  clahe->apply(lab_planes[0], dst);
+
+  // Merge the the color planes back into an Lab image
+  dst.copyTo(lab_planes[0]);
+  cv::merge(lab_planes, lab_image);
+
+  // convert back to RGB
+  cv::Mat image_clahe;
+  cv::cvtColor(lab_image, image_clahe, CV_Lab2BGR);
+
+  return image_clahe;
+
+}
+
+void denoise(cv::Mat &src, int i){ // may be needed in a task
+
+  cv::Mat dstx;
+
+  for (int j = 0; j < i; j++){
+    bilateralFilter(src, dstx, 6, 8, 8);
+    bilateralFilter(dstx, src, 6, 8, 8);
+  }
+
+}
+
 int main(int argc, char **argv){
 
   ros::init(argc, argv, "gate_detection");
@@ -398,7 +441,8 @@ int main(int argc, char **argv){
   ros::Rate loop_rate(10);
 
   image_transport::ImageTransport it(nh);
-  image_transport::Subscriber sub1 = it.subscribe("/varun/sensors/front_camera/image_raw", 1, imageCallback);
+  image_transport::Subscriber sub1 = it.subscribe("/varun/sensors/bottom_camera/image_raw", 1, imageCallback);
+  // image_transport::Subscriber sub1 = it.subscribe("/fourth_picture", 1, imageCallback);
   image_transport::Publisher pub1 = it.advertise("/first_picture", 1);
   image_transport::Publisher pub2 = it.advertise("/second_picture", 1);
   image_transport::Publisher pub3 = it.advertise("/third_picture", 1);
@@ -437,7 +481,7 @@ int main(int argc, char **argv){
   server.setCallback(f);
 
   cv::Scalar color = cv::Scalar(255, 255, 255);
-  cv::Point2f gate_center;
+  cv::Point gate_center;
   int net_x_cord;
   int net_y_cord;
 
@@ -484,12 +528,26 @@ int main(int argc, char **argv){
       }
 
       /// all the image proecssing till the threshold
-
-      frame.copyTo(balanced_image);
+      frame.copyTo(dst1);
+      balance_white(dst1);
+      image_clahe = color_correction(frame, 4);
+      denoise(image_clahe, 2);
+      image_clahe.copyTo(balanced_image);
       cv::Mat drawing(frame.rows, frame.cols, CV_8UC1, cv::Scalar::all(0));
       balance_white(balanced_image);
-      bilateralFilter(balanced_image, dst1, 4, 8, 8);
 
+      // bilateralFilter(balanced_image, dst1, 4, 8, 8);
+      denoise(balanced_image, 2);
+      sensor_msgs::ImagePtr msg1 = cv_bridge::CvImage(std_msgs::Header(), "bgr8", balanced_image).toImageMsg();
+      pub1.publish(msg1);
+
+      sensor_msgs::ImagePtr msg2 = cv_bridge::CvImage(std_msgs::Header(), "bgr8", image_clahe).toImageMsg();
+      pub2.publish(msg2);
+
+      sensor_msgs::ImagePtr msg3 = cv_bridge::CvImage(std_msgs::Header(), "bgr8", dst1).toImageMsg();
+      pub3.publish(msg3);
+
+      // sensor_msgs::ImagePtr msg3 = cv_bridge::CvImage(std_msgs::Header(), "mono8", thresholded_Mat).toImageMsg();
       cv::Scalar red_rod_min = cv::Scalar(blue_min[0], green_min[0], red_min[0], 0);
       cv::Scalar red_rod_max = cv::Scalar(blue_max[0], green_max[0], red_max[0], 0);
 
@@ -500,9 +558,9 @@ int main(int argc, char **argv){
       cv::Scalar black_rod_max = cv::Scalar(blue_max[2], green_max[2], red_max[2], 0);
 
       /// thresholding all the colors according to their thresholding values
-      cv::inRange(dst1, red_rod_min, red_rod_max, thresholded[0]);
-      cv::inRange(dst1, green_rod_min, green_rod_max, thresholded[1]);
-      cv::inRange(dst1, black_rod_min, black_rod_max, thresholded[2]);
+      cv::inRange(balanced_image, red_rod_min, red_rod_max, thresholded[0]);
+      cv::inRange(balanced_image, green_rod_min, green_rod_max, thresholded[1]);
+      cv::inRange(balanced_image, black_rod_min, black_rod_max, thresholded[2]);
 
       for (int i = 0; i < 3; i++)
       {
@@ -510,6 +568,7 @@ int main(int argc, char **argv){
         cv::dilate(thresholded[i], thresholded[i], getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5, 5)));
         cv::dilate(thresholded[i], thresholded[i], getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3)));
       }
+      //std::vector<std::vector<cv::Point> > contour;
 
       findContours(thresholded[0], contour0, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE);
       findContours(thresholded[1], contour1, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE);
@@ -527,7 +586,6 @@ int main(int argc, char **argv){
       draw_min_fit_rectangles(frame, drawing, contour0, contour1, contour2);
 
       if (gate_found){
-
         // if contour is not empty
         if (isGateDectected(contour0, contour1, contour2)){ // if there is even one contour
 
@@ -608,9 +666,6 @@ int main(int argc, char **argv){
         // contour is always empty
         continue;
       }
-
     } // if ends
-
   } // while ends
-
 }

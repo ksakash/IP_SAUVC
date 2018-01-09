@@ -24,15 +24,15 @@
 
 bool IP = false;
 int m1min, m1max, m2min, m2max, m3min, m3max;
-const int alpha;
-cv::Mat frame, newframe;
+// virtual int alpha;
+cv::Mat frame, newframe, dst1, image_clahe, src;
 std_msgs::Float64MultiArray array;
 
 void callback(IP_SAUVC::matConfig &config, uint32_t level)
 {
   m1min = config.m1min_param;
   m1max = config.m1max_param;
-  m1min = config.m1min_param;
+  m2min = config.m2min_param;
   m2max = config.m2max_param;
   m3min = config.m3min_param;
   m3max = config.m3max_param;
@@ -106,7 +106,7 @@ cv::Mat balance_white(cv::Mat src, float parameter){ // same for all the tasks
   return mat;
 }
 
-int get_largest_contour_index(std::vector<std::vector<cv::Point2f> > contours){
+int get_largest_contour_index(std::vector<std::vector<cv::Point> > contours){
 
   int largest_contour_index = 0;
   double largest_area = 0;
@@ -129,7 +129,7 @@ double distance(cv::Point2f a, cv::Point2f b){
   return (a.x-b.x)*(a.x-b.x)+(a.y-b.y)*(a.y-b.y);
 }
 
-cv::Point2f get_contour_center(std::vector<cv::Point2f> contour){
+cv::Point2f get_contour_center(std::vector<cv::Point> contour){
 
   std::vector<std::vector<cv::Point> > hull(1);
   cv::convexHull(cv::Mat(contour), hull[0], false);
@@ -144,6 +144,43 @@ cv::Point2f get_contour_center(std::vector<cv::Point2f> contour){
 
 }
 
+cv::Mat color_correction(cv::Mat &src, int parameter){ // same for all the tasks
+
+  std::vector<cv::Mat> lab_planes(3);
+  cv::Mat dst, lab_image;
+
+  cv::cvtColor(src, lab_image, CV_BGR2Lab);
+
+  // Extract the L channel
+  cv::split(lab_image, lab_planes);  // now we have the L image in lab_planes[0]
+
+  // apply the CLAHE algorithm to the L channel
+  cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE();
+  clahe->setClipLimit(parameter);
+
+  clahe->apply(lab_planes[0], dst);
+
+  // Merge the the color planes back into an Lab image
+  dst.copyTo(lab_planes[0]);
+  cv::merge(lab_planes, lab_image);
+
+  // convert back to RGB
+  cv::Mat image_clahe;
+  cv::cvtColor(lab_image, image_clahe, CV_Lab2BGR);
+
+  return image_clahe;
+
+}
+
+void denoise(cv::Mat &src, int i){ // may be needed in a task
+  cv::Mat dstx;
+
+  for (int j = 0; j < i; j++){
+    bilateralFilter(src, dstx, 6, 8, 8);
+    bilateralFilter(dstx, src, 6, 8, 8);
+  }
+}
+
 int main(int argc, char **argv){
 
   ros::init(argc, argv, "mat_finder");
@@ -153,6 +190,7 @@ int main(int argc, char **argv){
   ros::Rate loop_rate(10);
 
   image_transport::ImageTransport it(n);
+  // frame = cv::imread(argv[1], CV_LOAD_IMAGE_COLOR );
   image_transport::Subscriber sub1 = it.subscribe("/varun/sensors/front_camera/image_raw",1, imageCallback);
   image_transport::Publisher pub1 = it.advertise("/first_picture", 1);
   image_transport::Publisher pub2 = it.advertise("/second_picture", 1);
@@ -164,6 +202,7 @@ int main(int argc, char **argv){
   server.setCallback(f);
 
   cv::Mat balanced_image, dst, thresholded;
+  cv::Scalar color = cv::Scalar( 0, 0, 255 );
 
   while (ros::ok()){
 
@@ -176,24 +215,33 @@ int main(int argc, char **argv){
       continue;
     }
 
-    frame.copyTo(balanced_image);
-    balance_white(balanced_image, 0.05);
-    bilateralFilter(balanced_image, dst, 4, 8, 8);
+    frame.copyTo(src);
+    dst1 = balance_white(frame, 0.05);
+    image_clahe = color_correction(frame, 4);
+    denoise(image_clahe, 2);
+    cv::Mat drawing(frame.rows, frame.cols, CV_8UC1, cv::Scalar::all(0));
+    balanced_image = balance_white(image_clahe, 0.05);
+    denoise(balanced_image, 2);
+    sensor_msgs::ImagePtr msg3 = cv_bridge::CvImage(std_msgs::Header(), "bgr8", dst1).toImageMsg();
+    pub3.publish(msg3);
 
     cv::Scalar hsv_min = cv::Scalar(m1min, m2min, m3min, 0);
     cv::Scalar hsv_max = cv::Scalar(m1max, m2max, m3max, 0);
 
-    cv::inRange(dst, hsv_min, hsv_max, thresholded);
+    cv::inRange(dst1, hsv_min, hsv_max, thresholded);
 
+    // cv::dilate(thresholded, thresholded, getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5, 5)));
+    cv::dilate(thresholded, thresholded, getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3)));
+    cv::dilate(thresholded, thresholded, getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3)));
+    cv::dilate(thresholded, thresholded, getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3)));
     cv::dilate(thresholded, thresholded, getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5, 5)));
-    cv::dilate(thresholded, thresholded, getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5, 5)));
-    cv::dilate(thresholded, thresholded, getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3)));
-    cv::dilate(thresholded, thresholded, getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3)));
-    cv::dilate(thresholded, thresholded, getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3)));
 
-    if (IP){
+    sensor_msgs::ImagePtr msg1 = cv_bridge::CvImage(std_msgs::Header(), "mono8", thresholded).toImageMsg();
+    pub1.publish(msg1);
+
+    if (1){ // IP here
       // if half of the screen is green then we are inside the Mat
-      std::vector<std::vector<cv::Point2f> > contours;
+      std::vector<std::vector<cv::Point> > contours;
       findContours(thresholded, contours, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE);  // Find the contours in the image
 
       if (!contours.empty()){
@@ -203,8 +251,17 @@ int main(int argc, char **argv){
         double area = 0;
         double angle = 0;
         minRect = cv::minAreaRect(cv::Mat(contours[largest_contour_index]));
+
         cv::Point2f rect_points[4];
         minRect.points(rect_points);
+
+        for( int j = 0; j < 4; j++ ){
+          cv::line( drawing, rect_points[j], rect_points[(j+1)%4], color, 1, 8 );
+          cv::line( src, rect_points[j], rect_points[(j+1)%4], color, 1, 8 );
+        }
+
+        sensor_msgs::ImagePtr msg2 = cv_bridge::CvImage(std_msgs::Header(), "bgr8", src).toImageMsg();
+        pub2.publish(msg2);
 
         double a = sqrt(distance(rect_points[0], rect_points[1]));
         double b = sqrt(distance(rect_points[1], rect_points[2]));
@@ -216,13 +273,14 @@ int main(int argc, char **argv){
           angle = (rect_points[2].y - rect_points[1].y)/(rect_points[2].x - rect_points[1].x);
         }
 
-        cv::Point2f center_of_mass = get_center_of_contour(contours[largest_contour_index]);
+        cv::Point2f center_of_mass = get_contour_center(contours[largest_contour_index]);
         area = contourArea(contours[largest_contour_index], false);
+        array.data.push_back(center_of_mass.x);
+        array.data.push_back(center_of_mass.y);
+        array.data.push_back(area);
+        array.data.push_back(angle);
 
-        array.push_back(center_of_mass.x)
-        array.push_back(center_of_mass.y)
-        array.push_back(area);
-        array.push_back(angle);
+        pub.publish(array);
 
         ros::spinOnce();
         continue;
@@ -231,10 +289,12 @@ int main(int argc, char **argv){
 
       else {
 
-        array.push_back(0);
-        array.push_back(0);
-        array.push_back(0);
-        array.push_back(0);
+        array.data.push_back(0);
+        array.data.push_back(0);
+        array.data.push_back(0);
+        array.data.push_back(0);
+
+        pub.publish(array);
 
         ros::spinOnce();
         continue;
